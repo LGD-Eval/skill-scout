@@ -49,7 +49,9 @@ def write(path, text, binary=False):
 
 def _good_report(score=88, grade="B", verdict="PASS", with_tree=True):
     rep = {"score": score, "grade": grade, "verdict": verdict,
-           "evidence_grade": "E2", "authorization_status": "UNKNOWN",
+           "assessment_outcome": verdict,
+           "evidence_grade": "E2", "authorization_status": "NOT_GRANTED",
+           "execution_applicability": "NOT_APPLICABLE",
            "execution_decision": "NOT_APPLICABLE", "subject": {},
            "inputs": {"tree_sha256": "sha256:abcdef"}}
     if not with_tree:
