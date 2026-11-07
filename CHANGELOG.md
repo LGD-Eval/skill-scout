@@ -19,6 +19,7 @@
 - 新增 `.github/workflows/ci.yml`：语法编译 + 自测 + frontmatter 检查 + 禁止第二套阈值
 - `examples/` 中的真实对象分数改为实测值，虚构候选已标注
 - `references/lgd-three-laws.md` 明确权重定义在引擎，本文件只解释对应关系
+- 全文双语：README / SKILL.md / SECURITY / references 均为英文在前、中文在后
 
 ## 1.0.0 — 2026-11-06
 
