@@ -17,13 +17,7 @@ import re
 import subprocess
 import sys
 
-WEIGHTS = {
-    "structure": 25,
-    "layout": 15,
-    "docs": 20,
-    "security": 25,
-    "ecosystem": 15,
-}
+import state_machine
 
 REQUIRED_FIELDS = ("name", "description", "version", "license")
 
@@ -43,16 +37,28 @@ RISK_PATTERNS = [
 
 
 def read_text(path):
-    for enc in ("utf-8", "utf-8-sig", "gbk"):
+    """返回 (text, error)。读取/编码失败不静默返回空串，由调用方显式标记。"""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read(), None
+    except (UnicodeDecodeError, LookupError):
+        pass
+    except OSError as e:
+        return None, "读取失败：%s: %s" % (type(e).__name__, e)
+    for enc in ("utf-8-sig", "gbk"):
         try:
             with open(path, "r", encoding=enc) as f:
-                return f.read()
+                return f.read(), None
         except (UnicodeDecodeError, LookupError):
             continue
-    return ""
+        except OSError as e:
+            return None, "读取失败：%s: %s" % (type(e).__name__, e)
+    return None, "编码无法识别，未取得文件内容"
 
 
 def parse_frontmatter(text):
+    if not text:
+        return {}
     m = re.match(r"^---\s*\n(.*?)\n---", text, re.S)
     if not m:
         return {}
@@ -74,12 +80,13 @@ def grade_of(score):
 
 
 def find_engine(explicit=None):
+    # 优先级：显式 --engine > 环境变量 LGD_ENGINE > 相对路径自动探测
     cands = []
+    if explicit:
+        cands.append(explicit)
     env = os.environ.get("LGD_ENGINE")
     if env:
         cands.append(env)
-    if explicit:
-        cands.append(explicit)
     here = os.path.dirname(os.path.abspath(__file__))
     cands += [
         os.path.join(here, "evaluate.py"),
@@ -94,18 +101,100 @@ def find_engine(explicit=None):
     return None
 
 
+def _fail(kind, reason, returncode=None, stderr_tail=""):
+    return {"ok": False, "error_kind": kind, "reason": reason,
+            "returncode": returncode, "stderr_tail": (stderr_tail or "")[-160:]}
+
+
 def score_with_engine(engine, root):
+    """委托引擎评测，消费机器可读 Trust Report JSON。
+
+    主路径不再解析 stdout 正则；报告缺失/非法/缺必需字段/对象未绑定均分类失败，
+    不得静默取分。
+    """
+    import tempfile
+    _fd, report_path = tempfile.mkstemp(suffix=".json", prefix="lgd-report-")
+    os.close(_fd)
     try:
-        r = subprocess.run([sys.executable, engine, root],
-                           capture_output=True, text=True,
-                           encoding="utf-8", errors="replace", timeout=120)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    for ln in r.stdout.splitlines():
-        m = re.search(r"Trust Score:\s*(\d+)/100", ln)
-        if m:
-            return int(m.group(1))
-    return None
+        try:
+            r = subprocess.run([sys.executable, engine, root,
+                                 "--report-json", report_path],
+                                capture_output=True, text=True,
+                                encoding="utf-8", errors="replace", timeout=120)
+        except subprocess.TimeoutExpired:
+            return _fail("timeout", "引擎执行超时（>120s），未取得可信评测结果")
+        except OSError as e:
+            return _fail("os_error", "引擎进程无法启动：%s: %s" % (type(e).__name__, e))
+        except subprocess.SubprocessError as e:
+            return _fail("subprocess_error", "引擎进程异常：%s: %s" % (type(e).__name__, e))
+
+        err_lines = (r.stderr or "").strip().splitlines()
+        tail = err_lines[-1].strip() if err_lines else ""
+
+        if r.returncode != 0:
+            return _fail("nonzero_exit", "引擎退出码 %s，未取得可信评测结果" % r.returncode,
+                         returncode=r.returncode, stderr_tail=tail)
+
+        try:
+            if not os.path.exists(report_path) or os.path.getsize(report_path) == 0:
+                return _fail("no_report_json", "引擎未生成 Trust Report 报告文件",
+                             returncode=r.returncode, stderr_tail=tail)
+            with open(report_path, encoding="utf-8") as f:
+                report = json.load(f)
+        except OSError:
+            return _fail("no_report_json", "Trust Report 报告文件不可读",
+                         returncode=r.returncode, stderr_tail=tail)
+        except json.JSONDecodeError:
+            return _fail("report_invalid_json", "Trust Report 不是合法 JSON",
+                         returncode=r.returncode, stderr_tail=tail)
+
+        required = ["score", "grade", "evidence_grade",
+                    "authorization_status", "execution_decision", "subject", "inputs"]
+        missing = [k for k in required if k not in report]
+        if missing:
+            return _fail("missing_fields", "报告缺必需字段: %s" % ", ".join(missing),
+                         returncode=r.returncode, stderr_tail=tail)
+
+        score = report.get("score")
+        if not isinstance(score, int) or not 0 <= score <= 100:
+            return _fail("score_out_of_range", "报告分数 %r 超出 0–100 范围，报告不可信" % score,
+                         returncode=r.returncode, stderr_tail=tail)
+
+        tree = (report.get("inputs") or {}).get("tree_sha256")
+        if not tree:
+            return _fail("binding_missing", "报告缺对象树哈希（tree_sha256），对象未绑定",
+                         returncode=r.returncode, stderr_tail=tail)
+
+        outcome = report.get("assessment_outcome") or report.get("verdict")
+        if outcome == "INCOMPLETE":
+            return _fail("verdict_incomplete", "评测未完整执行（outcome=INCOMPLETE），不出可信分",
+                         returncode=r.returncode, stderr_tail=tail)
+        if outcome == "FAIL":
+            return _fail("verdict_fail", "验收未通过（assessment_outcome=FAIL），不出可信分",
+                         returncode=r.returncode, stderr_tail=tail)
+        if report.get("execution_decision") == "ALLOW" \
+                and report.get("authorization_status") != "VALID":
+            return _fail("authorization_bypass", "授权非 VALID 却 ALLOW，判定不可信",
+                         returncode=r.returncode, stderr_tail=tail)
+
+        return {"ok": True, "score": score,
+                "grade": report.get("grade") or grade_of(score),
+                "verdict": outcome,
+                "assessment_outcome": report.get("assessment_outcome"),
+                "evidence_grade": report.get("evidence_grade"),
+                "authorization_status": report.get("authorization_status"),
+                "execution_decision": report.get("execution_decision"),
+                "execution_applicability": report.get("execution_applicability"),
+                "tree_sha256": tree,
+                "engine_version": report.get("engine_version"),
+                "rule_version": report.get("rule_version"),
+                "report": report,
+                "returncode": r.returncode, "reason": None}
+    finally:
+        try:
+            os.unlink(report_path)
+        except OSError:
+            pass
 
 
 def prefilter(root):
@@ -114,11 +203,15 @@ def prefilter(root):
     if not os.path.exists(skill):
         return {"name": os.path.basename(root), "verdict": "别装",
                 "reason": "没有 SKILL.md，不是可分发的技能包", "source": "prefilter"}
-    body = read_text(skill)
+    body, body_err = read_text(skill)
     fm = parse_frontmatter(body)
     flags = []
     local = 0
     exfil = 0
+    unreadable = 0
+    if body_err:
+        unreadable += 1
+        flags.append("SKILL.md 不可读：" + body_err)
     for dp, _dn, fn in os.walk(root):
         rel = os.path.relpath(dp, root).replace("\\", "/").lower()
         if rel.startswith("tests") or "/tests/" in rel or "fixtures" in rel:
@@ -126,7 +219,10 @@ def prefilter(root):
         for f in fn:
             if not f.lower().endswith((".py", ".sh", ".js", ".ps1")):
                 continue
-            txt = read_text(os.path.join(dp, f))
+            txt, ferr = read_text(os.path.join(dp, f))
+            if ferr:
+                unreadable += 1
+                continue
             for pat, label in RISK_PATTERNS:
                 if not re.search(pat, txt):
                     continue
@@ -143,6 +239,8 @@ def prefilter(root):
         flags.append("frontmatter 缺 " + "/".join(missing))
     if local:
         flags.append("含 %d 处本地执行调用（需人工确认是否受控）" % local)
+    if unreadable:
+        flags.append("%d 个文件不可读，相关内容未纳入检查" % unreadable)
     verdict = "可装" if not flags else "慎用"
     return {"name": fm.get("name", os.path.basename(root)), "verdict": verdict,
             "reason": "；".join(flags) if flags else "结构完整、未检出高风险调用",
@@ -151,11 +249,21 @@ def prefilter(root):
 
 def render_engine(results):
     lines = ["=" * 62, "  🔭 技能侦察兵 · 候选排序（分数来自 LGD 引擎，同一口径）", "=" * 62]
-    for r in sorted(results, key=lambda x: x["score"], reverse=True):
+    ok = [r for r in results if r.get("status") == "EVALUATED"]
+    bad = [r for r in results if r.get("status") != "EVALUATED"]
+    for r in sorted(ok, key=lambda x: x["score"], reverse=True):
         lines.append("")
         lines.append("%-28s %3d/100  %s" % (r["name"], r["score"], r["grade"]))
         if r.get("path"):
             lines.append("    " + r["path"])
+    if bad:
+        lines.append("")
+        lines.append("-" * 62)
+        lines.append("  未完成评测（INCOMPLETE）：以下对象未取得可信 LGD 评分，不得视为 PASS")
+        for r in bad:
+            lines.append("")
+            lines.append("  %-26s [%s]" % (r["name"], r.get("error_kind", "unknown")))
+            lines.append("    " + r["reason"])
     lines.append("")
     lines.append("=" * 62)
     return "\n".join(lines)
@@ -189,20 +297,39 @@ def main():
     if engine:
         results = []
         for d in args.dirs:
-            sc = score_with_engine(engine, d)
-            if sc is None:
-                results.append({"name": os.path.basename(d), "verdict": "无法评分",
-                                "reason": "引擎没有给出分数", "source": "engine"})
-                continue
-            results.append({"name": os.path.basename(d), "score": sc,
-                            "grade": grade_of(sc), "path": d, "source": "engine"})
+            res = score_with_engine(engine, d)
+            if res["ok"]:
+                results.append({"name": os.path.basename(d), "status": "EVALUATED",
+                                "state": state_machine.EVALUATED,
+                                "score": res["score"], "grade": res["grade"],
+                                "verdict": res["verdict"],
+                                "evidence_grade": res["evidence_grade"],
+                                "authorization_status": res["authorization_status"],
+                                "execution_decision": res["execution_decision"],
+                                "tree_sha256": res["tree_sha256"],
+                                "engine_version": res["engine_version"],
+                                "rule_version": res["rule_version"],
+                                "path": d, "source": "engine",
+                                "returncode": res["returncode"]})
+            else:
+                results.append({"name": os.path.basename(d), "status": "INCOMPLETE",
+                                "state": state_machine.INCOMPLETE,
+                                "verdict": "无法评分", "reason": res["reason"],
+                                "error_kind": res["error_kind"], "source": "engine",
+                                "returncode": res["returncode"],
+                                "stderr_tail": res["stderr_tail"]})
         if args.json:
             print(json.dumps(results, ensure_ascii=False, indent=2))
         else:
             print(render_engine(results))
         return
 
-    results = [prefilter(d) for d in args.dirs]
+    results = []
+    for d in args.dirs:
+        p = prefilter(d)
+        p["state"] = (state_machine.REJECTED if p["verdict"] == "别装"
+                      else state_machine.REVIEWED)
+        results.append(p)
     if args.json:
         print(json.dumps(results, ensure_ascii=False, indent=2))
     else:

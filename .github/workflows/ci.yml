@@ -17,10 +17,16 @@ jobs:
           python-version: "3.11"
 
       - name: 语法编译
-        run: python -m py_compile scripts/scout_score.py tests/selftest.py
+        run: python -m py_compile scripts/scout_score.py scripts/state_machine.py tests/selftest.py tests/test_hardening.py tests/test_state_machine.py
 
       - name: 自测（无引擎降级路径）
         run: python tests/selftest.py
+
+      - name: 委托引擎负对照（非零退出/无报告/坏JSON/缺字段/缺绑定/越界/INCOMPLETE/混合成败/路径优先级/不可读）
+        run: python tests/test_hardening.py
+
+      - name: 八态状态机负对照（转换规则/复核门槛/否决阻断）
+        run: python tests/test_state_machine.py
 
       - name: frontmatter 必需字段
         run: |
