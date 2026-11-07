@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 语法编译
+        run: python -m py_compile scripts/scout_score.py tests/selftest.py
+
+      - name: 自测（无引擎降级路径）
+        run: python tests/selftest.py
+
+      - name: frontmatter 必需字段
+        run: |
+          f=SKILL.md
+          for k in name description version license; do
+            if ! head -n 15 "$f" | grep -q "^$k:"; then
+              echo "缺少 frontmatter 字段: $k"; exit 1
+            fi
+          done
+          echo "frontmatter 齐全"
+
+      - name: 不应出现第二套评分阈值
+        run: |
+          # 等级阈值只允许 90/80/70/60 这套（与 evaluate.py 一致），出现第二套说明又自建了口径
+          if grep -n 'if total >= 40' scripts/scout_score.py; then
+            echo "发现自建的第二套等级阈值"; exit 1
+          fi
+          echo "未发现第二套阈值"
