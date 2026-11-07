@@ -1,3 +1,9 @@
+# Example: full recommendation output
+
+**English summary** — The user asked "go find skills that would make you better". The scout split the request into queries, searched six channels (42 Coze / 11 Doubao / 19 GitHub repos), excluded 9 packages with unverifiable authors, 3 demanding full-disk permissions and 21 with no readable package content, then scored the remaining 6 with `scout_score.py`. It recommends two and explicitly discloses two it rejected and why. Every score below is a real engine measurement; the two fictional candidates exist only to demonstrate how the "not recommended" section is written. The full dialogue below stays in Chinese because it reproduces an actual session with a Chinese-speaking user.
+
+---
+
 # 示例：主人说「帮我找些技能，让你自己更强一点」
 
 下面是技能侦察兵的一次完整输出。
