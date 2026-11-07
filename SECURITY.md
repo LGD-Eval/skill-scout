@@ -1,3 +1,31 @@
+# Security Policy
+
+## Permission boundary
+
+- **Read-only.** This skill reads the directory structure and SKILL.md text of a candidate package. It never modifies, deletes, or uploads anything.
+- **No network use.** All searching is done by the host agent through its own browser/search tools. The bundled script runs locally, standard library only.
+- **Never executes candidate code.** Static text matching and structure checks only; scripts inside the package under review are never run.
+
+## Known risks and handling
+
+| Risk | Handling |
+|---|---|
+| Candidate package contains malicious scripts | Read text only, never execute; dangerous patterns are recorded as findings, not run |
+| Hallucinated recommendations | Hard rule: unverifiable author or source → never recommend, disclose as risk note |
+| Recommendation fatigue | Hard rule: at most 3 per turn; no repeat pushing without a request |
+| Score mistaken for official certification | Every output must state the score source; internal self-assessment is never presented as third-party certification |
+| Two different scores for one object | Scoring is delegated to `lgd-eval-engine`; without the engine no score is produced at all |
+
+## Data
+
+Collects, stores and transmits no user data. Scores are printed to the local terminal only.
+
+## Reporting
+
+Open an issue, or state the problem directly in the conversation.
+
+---
+
 # 安全说明（SECURITY）
 
 ## 权限边界
@@ -14,6 +42,7 @@
 | 幻觉推荐 | 硬规则：核实不了作者或来源的，一律不推荐，只作风险提示 |
 | 推销疲劳 | 硬规则：一次最多推 3 个，主人未要求不重复推销 |
 | 评分被当成官方认证 | 输出中必须注明"评分来源"，内部自评不得表述为第三方认证 |
+| 同一对象出现两个分数 | 打分一律委托 `lgd-eval-engine`；找不到引擎时干脆不出分 |
 
 ## 数据
 
