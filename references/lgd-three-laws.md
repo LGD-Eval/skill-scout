@@ -1,3 +1,54 @@
+# LGD Three Laws — Quick Reference
+
+Skill Scout uses these three laws to decide whether a skill or project is worth installing.
+
+## Registered — the record is traceable
+
+- Has a CHANGELOG; every version shows what changed
+- Declares authorship and license (frontmatter `author` / `license`)
+- Decisions and changes are recorded, not made on impulse
+
+**Ask**: Who made this? What changed in the last version? Who do I talk to when it breaks?
+
+## Evidenced — conclusions carry evidence
+
+- Has tests or measured output, not just marketing copy
+- Has a score, case, or report someone else can re-check
+- Claims match the code: the advertised feature actually exists
+
+**Ask**: It says it works — where is the evidence? Can I verify it myself?
+
+## Gated — checkpoints exist
+
+- A pre-release checklist exists
+- The permission boundary is written down (what it reads, what it writes, whether it uses the network)
+- Dangerous operations are blocked or confirmed
+
+**Ask**: What can it touch of mine? Is there a gate before something goes wrong?
+
+## Three hard rules (Skill Scout's operating criteria)
+
+1. Evidence over popularity
+2. Unverifiable author / unclear security boundary / excessive permissions → veto
+3. Tie-break by verifiability: re-checkable evidence within 10 minutes wins
+
+## Score mapping
+
+The table below explains which law each engine dimension belongs to, so you can explain why a point was deducted.
+**Weights and algorithm live in `lgd-eval-engine`'s `evaluate.py`; this file defines no weights of its own** —
+one object has exactly one score, so do not compute a second one from this table.
+
+| LGD law | Scoring dimension | Weight |
+|---|---|---|
+| Registered | Structure + Layout | 25 + 15 |
+| Evidenced | Documentation | 20 |
+| Gated | Security | 25 |
+| Ecosystem | Ecosystem compatibility | 15 |
+
+> Theoretical basis: LGD Three Laws · AI governance standards work (W3C / ITU-T FG-TIDA)
+
+---
+
 # LGD 三律 · 速查
 
 技能侦察兵用这套标准判断一个技能/项目值不值得装。
