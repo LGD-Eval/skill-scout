@@ -181,9 +181,11 @@ def main():
     ap.add_argument("dirs", nargs="+", help="候选技能目录")
     ap.add_argument("--json", action="store_true", help="以 JSON 输出")
     ap.add_argument("--engine", help="evaluate.py 路径（不给则自动探测）")
+    ap.add_argument("--no-engine", action="store_true",
+                    help="强制不找引擎，只走三档预筛（用于自测降级路径）")
     args = ap.parse_args()
 
-    engine = find_engine(args.engine)
+    engine = None if args.no_engine else find_engine(args.engine)
     if engine:
         results = []
         for d in args.dirs:
