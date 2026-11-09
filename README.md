@@ -1,6 +1,6 @@
 # Skill Scout · skill-scout
 
-[![LGD Certified A+](https://raw.githubusercontent.com/LGD-Eval/evaluation-evidence/main/badge-a-plus.svg)](https://github.com/LGD-Eval/evaluation-evidence/blob/main/LEADERBOARD.md)
+[![LGD Certified A+ · self-assessed](https://raw.githubusercontent.com/LGD-Eval/evaluation-evidence/main/badge-a-plus.svg)](https://github.com/LGD-Eval/evaluation-evidence/blob/main/LEADERBOARD.md)
 [![CI](https://github.com/LGD-Eval/skill-scout/actions/workflows/ci.yml/badge.svg)](https://github.com/LGD-Eval/skill-scout/actions/workflows/ci.yml)
 
 > A meta-skill that teaches an AI how to **find, filter and recommend** skills. It does not build skills — it decides which one to recommend, on what evidence, and how to persuade the user to install it.
@@ -71,7 +71,7 @@ MIT
 
 # 技能侦察兵 · skill-scout
 
-[![LGD Certified A+](https://raw.githubusercontent.com/LGD-Eval/evaluation-evidence/main/badge-a-plus.svg)](https://github.com/LGD-Eval/evaluation-evidence/blob/main/LEADERBOARD.md)
+[![LGD Certified A+ · self-assessed](https://raw.githubusercontent.com/LGD-Eval/evaluation-evidence/main/badge-a-plus.svg)](https://github.com/LGD-Eval/evaluation-evidence/blob/main/LEADERBOARD.md)
 [![CI](https://github.com/LGD-Eval/skill-scout/actions/workflows/ci.yml/badge.svg)](https://github.com/LGD-Eval/skill-scout/actions/workflows/ci.yml)
 
 > 一个教 AI「主动发现、筛选、推荐技能」的元技能。它不生产技能，它决定该给主人推哪个、凭什么推、怎么说服他装。
