@@ -19,7 +19,7 @@ What you actually want: **it searches, it scores, it recommends 1–3, it says w
 ```bash
 git clone https://github.com/LGD-Eval/skill-scout
 cd skill-scout
-python tests/selftest.py                       # 7 assertions, no external fixture needed
+python tests/selftest.py                       # 5 assertions without an engine; 2 more with --engine
 python scripts/scout_score.py <candidate-dir>  # scores via engine, or a 3-tier verdict without one
 ```
 
@@ -51,9 +51,9 @@ This is deliberate: one object must never carry two different scores. The v1.0.0
 
 | Item | Result |
 |---|---|
-| Self score (LGD engine) | 100/100 A+ |
-| Security scan | 0 medium, 0 low |
-| Self-test | 7/7 pass |
+| Self score (LGD engine) | 100/100 A+ — self-assessed, no third-party review yet |
+| Security scan | 0 medium, 0 low — self-run, no published SARIF or report |
+| Self-test | 5/5 pass without an engine · 7/7 with --engine |
 | Score parity with engine | identical on all sampled packages |
 
 ## Known limitations
@@ -90,7 +90,7 @@ MIT
 ```bash
 git clone https://github.com/LGD-Eval/skill-scout
 cd skill-scout
-python tests/selftest.py                       # 自测，7 项断言，不依赖外部样本
+python tests/selftest.py                       # 无引擎 5 项断言，带 --engine 再加 2 项
 python scripts/scout_score.py <候选技能目录>     # 有引擎则出分，无引擎则三档预筛
 ```
 
@@ -124,9 +124,9 @@ python scripts/scout_score.py --engine /path/to/evaluate.py <候选目录>
 
 | 项 | 结果 |
 |---|---|
-| 自评（LGD 引擎） | 100/100 A+ |
-| 安全扫描 | 0 中危 0 低危 |
-| 自测 | 7/7 通过 |
+| 自评（LGD 引擎） | 100/100 A+ —— 自评，尚无第三方复核 |
+| 安全扫描 | 0 中危 0 低危 —— 本方自跑，无公开 SARIF/报告 |
+| 自测 | 无引擎 5/5 · 带 --engine 7/7 |
 | 与引擎分数一致性 | 全部抽样包逐分一致 |
 
 ## 已知限制
